@@ -1,100 +1,69 @@
-import { faker } from '@faker-js/faker';
+import { faker } from '@faker-js/faker'
 
-describe('Teste da Api Raromdb - testes de autenticação', () => {
-  var fakeName = faker.internet.userName();
-  var fakeEmail = faker.internet.email();
-  var fakePassword = faker.internet.password({ length: 12 });
-  let userData;
-  let userId;
-  let accessToken;
+let token
+let userId
+let fakeName
+let fakeEmail
+let fakePassword
 
-  it('Deve cadastrar um novo usuário', () => {
-    cy.request({
-      method: 'POST',
-      url: 'https://raromdb-3c39614e42d4.herokuapp.com/api/users',
-      body: {
-        "name": fakeName,
-        "email": fakeEmail,
-        "password": fakePassword
-      }
+describe('Teste Api Raromdb - Autenticação', () => {
+
+  before(() => {
+    fakeName = faker.internet.userName();
+    fakeEmail = faker.internet.email();
+    fakePassword = faker.internet.password({ length: 12 });
+
+    cy.newUser(fakeName, fakeEmail, fakePassword, true).then((response) => {
+       expect(response.status).to.equal(201);
+       userId = response.body.id
     })
+  })
+
+  it('Deve verificar senha incorreta', () => {
+    cy.login(fakeEmail, "wrongPassword", false)
     .then((response)=>{
-      expect(response.status).to.equal(201),
-      userId = response.body.id,
-      cy.wrap(userId).as('userId'),
-      userData = response.body,
-      cy.wrap(userData).as('userData')
-      cy.log(response.body)
-    })
-  });
- 
-  it('Deve enviar mensagem de erro por senha muito longa', () => {
-    cy.request({
-      method: 'POST',
-      url: 'https://raromdb-3c39614e42d4.herokuapp.com/api/users',
-      body: {
-        "name": fakeName,
-        "email": fakeEmail,
-        "password": "veryLongPassword"
-      },
-      failOnStatusCode: false
-    })
-    .then((response)=>{
-      expect(response.status).to.equal(400),
-      expect(response.body.message).to.be.an('array')
-      expect(response.body.message).to.contain('password must be shorter than or equal to 12 characters')
-      cy.log(response.body)
+      expect(response.status).to.equal(401);
+      expect(response.body.message).to.equal('Invalid username or password.')
     });
   });
 
-  it('Deve enviar mensagem de erro por email já em uso', () => {
-    cy.request({
-      method: 'POST',
-      url: 'https://raromdb-3c39614e42d4.herokuapp.com/api/users',
-      body: {
-        "name": fakeName,
-        "email": fakeEmail,
-        "password": fakePassword
-      },
-      failOnStatusCode: false
-    })
+  it('Deve verificar email inválido', () => {
+    cy.login("wrongEmail", fakePassword, false)
     .then((response)=>{
-      expect(response.status).to.equal(409),
-      expect(response.body.message).to.equal('Email already in use')
-      cy.log(response.body)
+      expect(response.status).to.equal(400);
+      expect(response.body.message).to.deep.equal(['email must be an email'])
+    });
+  });
+
+  it('Deve verificar campo Email vazio', () => {
+    cy.login(null, fakePassword, false)
+    .then((response)=>{
+      expect(response.status).to.equal(400);
+      expect(response.body.message).to.deep.equal(['email should not be empty', 'email must be an email'])
+    });
+  });
+
+  it('Deve verificar campo Senha vazio', () => {
+    cy.login(fakeEmail, null, false)
+    .then((response)=>{
+      expect(response.status).to.equal(400);
+      expect(response.body.message).to.deep.equal(['password must be a string', 'password should not be empty'])
+    });
+  });
+
+  it('Deve verificar ambos os campos vazios', () => {
+    cy.login(null, null, false)
+    .then((response)=>{
+      expect(response.status).to.equal(400);
+      expect(response.body.message).to.deep.equal(['email should not be empty', 'email must be an email', 'password must be a string', 'password should not be empty'])
     });
   });
 
   it('Deve realizar o login com sucesso', () => {
-    cy.request({
-      method: 'POST',
-      url: 'https://raromdb-3c39614e42d4.herokuapp.com/api/auth/login',
-      body: {
-        "email": fakeEmail,
-        "password": fakePassword
-      }
-    })
+    cy.login(fakeEmail, fakePassword, true)
     .then((response)=>{
-      expect(response.status).to.equal(200),
-      accessToken = response.body.accessToken,
-      cy.wrap(accessToken).as('accessToken')
-    });
-  });
-  
-  it('Deve verificar senha incorreta', () => {
-    cy.request({
-      method: 'POST',
-      url: 'https://raromdb-3c39614e42d4.herokuapp.com/api/auth/login',
-      body: {
-        "email": fakeEmail,
-        "password": "wrongPassword"
-      },
-      failOnStatusCode: false
+      expect(response.status).to.equal(200);
+      token = response.body.accessToken
     })
-    .then((response)=>{
-      expect(response.status).to.equal(401)
-      expect(response.body.message).to.equal('Invalid username or password.')
-      cy.log(response.body)
-    });
-  });
+  })
 })
